@@ -11,29 +11,22 @@ import java.text.DecimalFormat;
 import javax.net.ssl.HttpsURLConnection;
 
 import org.jaudiotagger.audio.AudioFile;
-import org.jaudiotagger.audio.exceptions.CannotReadException;
-import org.jaudiotagger.audio.exceptions.CannotWriteException;
-import org.jaudiotagger.audio.exceptions.InvalidAudioFrameException;
-import org.jaudiotagger.audio.exceptions.ReadOnlyFileException;
 import org.jaudiotagger.audio.flac.FlacFileReader;
 import org.jaudiotagger.tag.FieldKey;
-import org.jaudiotagger.tag.KeyNotFoundException;
-import org.jaudiotagger.tag.TagException;
 import org.jaudiotagger.tag.flac.FlacTag;
 import org.jaudiotagger.tag.images.Artwork;
 import org.jaudiotagger.tag.images.ArtworkFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JamendoFlacDownloader {
 	
-	public static final String JAMENDO_API_ALBUM_URL_STUB = "https://api.jamendo.com/v3.0/albums/tracks?client_id=9d9f42e3&format=json&order=track_position&id=%s&imagesize=600&audioformat=flac&audiodlformat=flac";
+	private static final Logger log = LoggerFactory.getLogger(JamendoFlacDownloader.class);
 	
-	public static void main(String[] args) throws IOException, KeyNotFoundException, CannotReadException, TagException, ReadOnlyFileException, InvalidAudioFrameException, CannotWriteException {
-		JamendoFlacDownloader downloader = new JamendoFlacDownloader();
-		downloader.downloadAlbum("C:/Users/Ampp33/Desktop", "150083");
-	}
+	public static final String JAMENDO_API_ALBUM_URL_STUB = "https://api.jamendo.com/v3.0/albums/tracks?client_id=9d9f42e3&format=json&order=track_position&id=%s&imagesize=600&audioformat=flac&audiodlformat=flac";
 	
 	private JamendoProgressToken progressToken = null;
 	
@@ -45,6 +38,7 @@ public class JamendoFlacDownloader {
 	
 	public void downloadAlbum(String workingDirectoryPath, String albumId) throws IOException {
 		String jamendoAlbumApiUrl = String.format(JAMENDO_API_ALBUM_URL_STUB, albumId);
+		log.debug("album download dir: " + jamendoAlbumApiUrl);
 		
 		HttpsURLConnection conn = null;
 		InputStream albumJsonStream = null;
@@ -81,6 +75,7 @@ public class JamendoFlacDownloader {
 				
 				JSONArray tracks = album.getJSONArray("tracks");
 				int noOfTracks = tracks.length();
+				log.debug("number of tracks in album: " + noOfTracks);
 				for (Object trackObj : tracks) {
 					JSONObject track = (JSONObject) trackObj;
 					int trackNo = Integer.parseInt(track.getString("position"));
@@ -88,14 +83,16 @@ public class JamendoFlacDownloader {
 					String trackDownloadUrl = track.getString("audiodownload");
 					
 					updateStatus("Downloading track " + trackNo + "/" + noOfTracks +": " + trackName);
-					System.out.println(trackName + ": " + trackDownloadUrl);
+					log.debug(trackName + ": " + trackDownloadUrl);
 					File trackFile = downloadTrack(trackDownloadUrl, albumDir.getAbsolutePath(), noOfTracks, trackNo, trackName);
 					updateStatus("Updating track" + trackNo + "/" + noOfTracks + " metadata...");
-//					updateTrackMetadata(artist, albumName, albumYear, albumArtUrl, noOfTracks, trackNo, trackName, trackFile);
+					updateTrackMetadata(artist, albumName, albumYear, albumArtUrl, noOfTracks, trackNo, trackName, trackFile);
+//					downloadAlbumArtwork(albumDir, albumArtUrl);
 					updateStatus("Track" + trackNo + "/" + noOfTracks + " completed!");
 				}
 			}
 		} finally {
+			log.debug("closing album connection");
 			if(conn != null) {
 				conn.disconnect();
 			}
@@ -120,6 +117,12 @@ public class JamendoFlacDownloader {
 	 */
 	private void updateTrackMetadata(String artist, String albumName, String albumYear, String albumArtUrl,
 			int noOfTracks, int trackNo, String trackName, File trackFile) throws IOException {
+		log.debug("artist: " + artist);
+		log.debug("albumName: " + albumName);
+		log.debug("albumYear: " + albumYear);
+		log.debug("albumArtUrl: " + albumArtUrl);
+		log.debug("trackNo: " + trackNo);
+		log.debug("trackName: " + trackName);
 		try {
 			AudioFile audioFile = new FlacFileReader().read(trackFile);
 			audioFile.setExt("flac");
@@ -163,6 +166,8 @@ public class JamendoFlacDownloader {
 		String albumAbsolutePath = workingDir.getAbsolutePath()
 								+ File.separator
 								+ artistName + " - " + albumName + " [FLAC]";
+		
+		log.debug("album destination dir: " + albumAbsolutePath);
 		File albumDir = new File(albumAbsolutePath);
 		if(albumDir.exists()) {
 			throw new IOException("destination album directory already exists: " + albumAbsolutePath);
@@ -212,7 +217,7 @@ public class JamendoFlacDownloader {
 		// download file
 		try(InputStream stream = new URL(trackDownloadUrl).openStream();
 			FileOutputStream fos = new FileOutputStream(trackFile)) {
-			byte[] buffer = new byte[5120000];
+			byte[] buffer = new byte[512000000];
 			int bytesRead = -1;
 			double totalBytesRead = 0;
 			while((bytesRead = stream.read(buffer, 0, buffer.length)) != -1) {
@@ -224,6 +229,21 @@ public class JamendoFlacDownloader {
 		}
 		
 		return trackFile;
+	}
+	
+	private void downloadAlbumArtwork(File albumDir, String albumArtUrl) throws IOException {
+		File artworkFile = new File(albumDir.getAbsolutePath() + File.separator + "cover.jpg");
+		// download file
+		try(InputStream stream = new URL(albumArtUrl).openStream();
+			FileOutputStream fos = new FileOutputStream(artworkFile)) {
+			byte[] buffer = new byte[51200];
+			int bytesRead = -1;
+			while((bytesRead = stream.read(buffer, 0, buffer.length)) != -1) {
+				fos.write(buffer, 0, bytesRead);
+			}
+			
+			fos.flush();
+		}
 	}
 	
 	/**
@@ -249,6 +269,7 @@ public class JamendoFlacDownloader {
 	}
 	
 	private void updateStatus(String status) {
+		log.info(status);
 		if(progressToken != null) {
 			progressToken.setMessage(status);
 		}

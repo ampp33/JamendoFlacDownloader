@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<define name="jarLocation" class="org.malibu.util.JarDirDefiner"/>
+	<appender name="file" class="ch.qos.logback.core.FileAppender">
+		<append>true</append>
+		<file>${jarLocation}/jamendo.log</file>
+		
+		<encoder>
+			<pattern>%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n</pattern>
+		</encoder>
+	</appender>
+	
+	<root level="info">
+		<appender-ref ref="file" />
+	</root>
+	
+	<logger name="some.class" level="OFF" />
+	
+</configuration>

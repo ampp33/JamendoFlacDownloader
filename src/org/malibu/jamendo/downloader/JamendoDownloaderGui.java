@@ -14,6 +14,7 @@ import java.io.IOException;
 
 import javax.swing.JButton;
 import javax.swing.JDialog;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
@@ -21,8 +22,12 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import org.malibu.util.Util;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class JamendoDownloaderGui extends JDialog {
+public class JamendoDownloaderGui extends JFrame {
+	
+	private static final Logger log = LoggerFactory.getLogger(JamendoDownloaderGui.class);
 	
 	private static final long serialVersionUID = 1L;
 
@@ -50,10 +55,9 @@ public class JamendoDownloaderGui extends JDialog {
 	 * Create the dialog.
 	 */
 	public JamendoDownloaderGui() {
-		final JDialog dialog = this;
-		
 		setUndecorated(true);
-		setBounds(100, 100, 600, 36);
+		final JFrame parent = this;
+		setBounds(100, 100, 598, 38);
 		getContentPane().setLayout(new BorderLayout(0, 0));
 		{
 			JPanel buttonPane = new JPanel();
@@ -100,7 +104,7 @@ public class JamendoDownloaderGui extends JDialog {
 								downloader.downloadAlbum(Util.getJarDirectory(), textField.getText());
 								lastDownloadSuccess = true;
 							} catch (IOException e1) {
-								e1.printStackTrace();
+								log.error("error occurred during download", e1);
 							}
 							lblJamendoMusicDownloader.setText(APP_TITLE + " [ Job: " + (lastDownloadSuccess ? "Success" : "Failure") + " ]");
 						}
@@ -149,7 +153,7 @@ public class JamendoDownloaderGui extends JDialog {
 				@Override
 				public void keyPressed(KeyEvent e) {
 					if(e.getKeyCode() == KeyEvent.VK_ESCAPE) {
-						dialog.dispose();
+						parent.dispose();
 					}
 				}
 			});
@@ -174,7 +178,7 @@ public class JamendoDownloaderGui extends JDialog {
 			btnCancel.addActionListener(new ActionListener() {
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					dialog.dispose();
+					parent.dispose();
 				}
 			});
 			buttonPane.add(btnCancel);
